@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/textproto"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -76,6 +77,74 @@ func TestConnect(t *testing.T) {
 				assert.Nil(t, err, "got unexpected err %v", err)
 				assert.NotNil(t, s.reader, "no reader created")
 				assert.NotNil(t, s.writer, "no writer created")
+			} else {
+				assert.NotNil(t, err, "got nil err, but was expecting %v", tc.outErr)
+				assert.EqualError(t, tc.outErr, err.Error())
+			}
+		})
+	}
+}
+
+var readHold []byte
+
+type fakeConn struct{}
+
+func (f *fakeConn) Read(p []byte) (int, error) {
+	readHold = p
+	return 0, nil
+}
+
+var writeHold []string
+
+func (f *fakeConn) Write(p []byte) (int, error) {
+	// convert p to a string so that it will persist
+	// if it's left as a []byte it will be overwritten because of the semantics
+	// of the bufio writer using a pointer :'(
+	writeHold = append(writeHold, string(p))
+	//
+	return len(p), nil
+}
+
+func TestLogin(t *testing.T) {
+	s, _ := NewService()
+	s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
+	s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
+	testcases := map[string]struct {
+		username string
+		password string
+		written  []string
+		outErr   error
+	}{
+		"No username": {
+			outErr: fmt.Errorf("no username supplised for Login, cannot continue"),
+		},
+		"No password": {
+			username: "fake-user",
+			outErr:   fmt.Errorf("password supplied not long enough, got %d, require %d", 0, minpasswordlength),
+		},
+		"password too short": {
+			username: "fake-user",
+			password: "small",
+			outErr:   fmt.Errorf("password supplied not long enough, got %d, require %d", utf8.RuneCountInString("small"), minpasswordlength),
+		},
+		"successful login": {
+			username: "fake-user",
+			password: "fake-pass",
+			written:  []string{"USER fake-user 8 * :fake-user\r\n", "NICK fake-user\r\n", "PRIVMSG NickServ :identify fake-user fake-pass\r\n"},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			defer func() { fmt.Println("EMPTYING"); writeHold = []string{} }()
+			err := s.Login(tc.username, tc.password)
+			if tc.outErr == nil {
+				assert.Nil(t, err, "got unexpected err %v", err)
+				assert.Len(t, writeHold, len(tc.written), "got different length array")
+				for i := range tc.written {
+					// order of values must be the same, and must be equal
+					assert.Equal(t, tc.written[i], writeHold[i])
+				}
 			} else {
 				assert.NotNil(t, err, "got nil err, but was expecting %v", tc.outErr)
 				assert.EqualError(t, tc.outErr, err.Error())

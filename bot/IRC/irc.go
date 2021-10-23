@@ -8,7 +8,10 @@ import (
 	"log"
 	"net"
 	"net/textproto"
+	"unicode/utf8"
 )
+
+const minpasswordlength = 6
 
 type service struct {
 	connection net.Conn
@@ -66,7 +69,18 @@ func (s *service) Disconnect(server, mode string) error {
 
 // Login to the server with the supplied credentials
 func (s *service) Login(username, password string) error {
-	return fmt.Errorf("not implemented")
+	if username == "" {
+		return fmt.Errorf("no username supplised for Login, cannot continue")
+	}
+	if utf8.RuneCountInString(password) < minpasswordlength {
+		return fmt.Errorf("password supplied not long enough, got %d, require %d", utf8.RuneCountInString(password), minpasswordlength)
+	}
+	s.writer.PrintfLine("USER %s 8 * :%s", username, username)
+	s.writer.PrintfLine("NICK %s", username)
+	str := fmt.Sprintf("PRIVMSG NickServ :identify %s %s", username, password)
+	log.Printf("nick: %q password: '******' identify", username)
+	s.writer.PrintfLine(str)
+	return nil
 }
 
 // Join the supplied channel
