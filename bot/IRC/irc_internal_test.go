@@ -85,25 +85,6 @@ func TestConnect(t *testing.T) {
 	}
 }
 
-var readHold []byte
-
-type fakeConn struct{}
-
-func (f *fakeConn) Read(p []byte) (int, error) {
-	readHold = p
-	return 0, nil
-}
-
-var writeHold []string
-var writeErr error
-
-func (f *fakeConn) Write(p []byte) (int, error) {
-	// convert p to a string so that it will persist
-	// if it's left as a []byte it will be overwritten because of the semantics
-	// of the bufio writer using a pointer :'(
-	writeHold = append(writeHold, string(p))
-	//
-	return len(p), writeErr
 }
 
 func TestLogin(t *testing.T) {
