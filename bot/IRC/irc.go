@@ -75,11 +75,20 @@ func (s *service) Login(username, password string) error {
 	if utf8.RuneCountInString(password) < minpasswordlength {
 		return fmt.Errorf("password supplied not long enough, got %d, require %d", utf8.RuneCountInString(password), minpasswordlength)
 	}
-	s.writer.PrintfLine("USER %s 8 * :%s", username, username)
-	s.writer.PrintfLine("NICK %s", username)
+	err := s.writer.PrintfLine("USER %s 8 * :%s", username, username)
+	if err != nil {
+		return fmt.Errorf("Login User error %w", err)
+	}
+	err = s.writer.PrintfLine("NICK %s", username)
+	if err != nil {
+		return fmt.Errorf("Login Nick error %w", err)
+	}
 	str := fmt.Sprintf("PRIVMSG NickServ :identify %s %s", username, password)
 	log.Printf("nick: %q password: '******' identify", username)
-	s.writer.PrintfLine(str)
+	err = s.writer.PrintfLine(str)
+	if err != nil {
+		return fmt.Errorf("Login identify error %w", err)
+	}
 	return nil
 }
 

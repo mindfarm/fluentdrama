@@ -95,6 +95,7 @@ func (f *fakeConn) Read(p []byte) (int, error) {
 }
 
 var writeHold []string
+var writeErr error
 
 func (f *fakeConn) Write(p []byte) (int, error) {
 	// convert p to a string so that it will persist
@@ -102,7 +103,7 @@ func (f *fakeConn) Write(p []byte) (int, error) {
 	// of the bufio writer using a pointer :'(
 	writeHold = append(writeHold, string(p))
 	//
-	return len(p), nil
+	return len(p), writeErr
 }
 
 func TestLogin(t *testing.T) {
@@ -113,6 +114,7 @@ func TestLogin(t *testing.T) {
 		username string
 		password string
 		written  []string
+		writeErr error
 		outErr   error
 	}{
 		"No username": {
@@ -127,6 +129,13 @@ func TestLogin(t *testing.T) {
 			password: "small",
 			outErr:   fmt.Errorf("password supplied not long enough, got %d, require %d", utf8.RuneCountInString("small"), minpasswordlength),
 		},
+		"writer error": {
+			username: "fake-user",
+			password: "fake-pass",
+			writeErr: fmt.Errorf("fake-error"),
+			outErr:   fmt.Errorf("Login User error fake-error"),
+			written:  []string{"USER fake-user 8 * :fake-user\r\n", "NICK fake-user\r\n", "PRIVMSG NickServ :identify fake-user fake-pass\r\n"},
+		},
 		"successful login": {
 			username: "fake-user",
 			password: "fake-pass",
@@ -137,6 +146,8 @@ func TestLogin(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			defer func() { fmt.Println("EMPTYING"); writeHold = []string{} }()
+			writeErr = tc.writeErr
+			defer func() { writeErr = nil }()
 			err := s.Login(tc.username, tc.password)
 			if tc.outErr == nil {
 				assert.Nil(t, err, "got unexpected err %v", err)
