@@ -63,8 +63,15 @@ func (s *service) Connect(server string, useTLS bool) error {
 }
 
 // Disconnect from the server
-func (s *service) Disconnect(server, mode string) error {
-	return fmt.Errorf("not implemented")
+func (s *service) Disconnect() error {
+	if err := s.writer.PrintfLine("QUIT"); err != nil {
+		return fmt.Errorf("disconnect quit error %w", err)
+	}
+	if err := s.connection.Close(); err != nil {
+		return fmt.Errorf("disconnect close error %w", err)
+	}
+	log.Println("connection close")
+	return nil
 }
 
 // Login to the server with the supplied credentials

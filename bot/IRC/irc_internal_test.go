@@ -85,6 +85,38 @@ func TestConnect(t *testing.T) {
 	}
 }
 
+func TestDisconnect(t *testing.T) {
+	testcases := map[string]struct {
+		closeErr error
+		writeErr error
+		outErr   error
+	}{
+		"quit error": {
+			writeErr: fmt.Errorf("fake-write-error"),
+			outErr:   fmt.Errorf("disconnect quit error fake-write-error"),
+		},
+		"close error": {
+			closeErr: fmt.Errorf("fake-close-error"),
+			outErr:   fmt.Errorf("disconnect close error fake-close-error"),
+		},
+		"successful closure": {},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			s, _ := NewService()
+			s.connection = &fakeConn{}
+			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
+			closeErr = tc.closeErr
+			writeErr = tc.writeErr
+			err := s.Disconnect()
+			if tc.outErr == nil {
+				assert.Nil(t, err, "got unexpected err %v", err)
+			} else {
+				assert.NotNil(t, err, "got nil err, but was expecting %v", tc.outErr)
+				assert.EqualError(t, tc.outErr, err.Error())
+			}
+		})
+	}
 }
 
 func TestLogin(t *testing.T) {
