@@ -1,15 +1,19 @@
 package IRC
 
 import (
+	"bufio"
 	"crypto/rand"
 	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
+	"net/textproto"
 )
 
 type service struct {
 	connection net.Conn
+	reader     *textproto.Reader
+	writer     *textproto.Writer
 }
 
 // NewService -
@@ -47,6 +51,11 @@ func (s *service) Connect(server string, useTLS bool) error {
 		log.Printf("dial server using address %s produced error %v", server, err)
 		return err
 	}
+	// Create reader and writer so we can communicate with the server
+	r := bufio.NewReader(s.connection)
+	w := bufio.NewWriter(s.connection)
+	s.reader = textproto.NewReader(r)
+	s.writer = textproto.NewWriter(w)
 	return nil
 }
 

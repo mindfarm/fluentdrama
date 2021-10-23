@@ -1,9 +1,11 @@
 package IRC
 
 import (
+	"bufio"
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/textproto"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,6 +74,8 @@ func TestConnect(t *testing.T) {
 			err := s.Connect(tc.server, tc.useTLS)
 			if tc.outErr == nil {
 				assert.Nil(t, err, "got unexpected err %v", err)
+				assert.NotNil(t, s.reader, "no reader created")
+				assert.NotNil(t, s.writer, "no writer created")
 			} else {
 				assert.NotNil(t, err, "got nil err, but was expecting %v", tc.outErr)
 				assert.EqualError(t, tc.outErr, err.Error())
