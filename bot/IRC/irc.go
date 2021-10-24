@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/textproto"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -17,13 +18,17 @@ type service struct {
 	connection net.Conn
 	reader     *textproto.Reader
 	writer     *textproto.Writer
+	Channels   map[string]struct{}
+	m          sync.RWMutex
 }
 
 // NewService -
 // ignore returns unexported type linter warning (revive)
 // nolint:revive
 func NewService() (*service, error) {
-	return &service{}, nil
+	return &service{
+		Channels: map[string]struct{}{},
+	}, nil
 }
 
 // expose these as package globals to enable themt o be faked for testing
@@ -84,24 +89,39 @@ func (s *service) Login(username, password string) error {
 	}
 	err := s.writer.PrintfLine("USER %s 8 * :%s", username, username)
 	if err != nil {
-		return fmt.Errorf("Login User error %w", err)
+		return fmt.Errorf("login User error %w", err)
 	}
 	err = s.writer.PrintfLine("NICK %s", username)
 	if err != nil {
-		return fmt.Errorf("Login Nick error %w", err)
+		return fmt.Errorf("login Nick error %w", err)
 	}
 	str := fmt.Sprintf("PRIVMSG NickServ :identify %s %s", username, password)
 	log.Printf("nick: %q password: '******' identify", username)
 	err = s.writer.PrintfLine(str)
 	if err != nil {
-		return fmt.Errorf("Login identify error %w", err)
+		return fmt.Errorf("login identify error %w", err)
 	}
 	return nil
 }
 
-// Join the supplied channel
+// Join the supplied channel - it doesn't matter if we join the same channel a
+// trillion times.
 func (s *service) Join(channel string) error {
-	return fmt.Errorf("not implemented")
+	if channel == "" {
+		// Bail if no channel supplied - it's not an error though
+		log.Printf("No channel name supplied")
+		return nil
+	}
+	log.Printf("Join channel %s", channel)
+	if err := s.writer.PrintfLine(fmt.Sprintf("JOIN %s", channel)); err != nil {
+		return fmt.Errorf("channel join error %w", err)
+	}
+
+	// Add the channel to the map of channels that the bot has a presence in
+	s.m.Lock()
+	defer s.m.Unlock()
+	s.Channels[channel] = struct{}{}
+	return nil
 }
 
 // Part from the supplied channel
