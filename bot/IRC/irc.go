@@ -139,9 +139,7 @@ func (s *service) Part(channel string) error {
 	// Remove the channel from the map of channels that the bot has a presence in
 	s.m.Lock()
 	defer s.m.Unlock()
-	if _, ok := s.Channels[channel]; ok {
-		delete(s.Channels, channel)
-	}
+	delete(s.Channels, channel)
 	return nil
 }
 

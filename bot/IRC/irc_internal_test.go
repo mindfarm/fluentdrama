@@ -265,7 +265,7 @@ func TestPart(t *testing.T) {
 			// Set up
 			writeErr = nil
 			for _, c := range tc.channels {
-				s.Join(c)
+				_ = s.Join(c)
 			}
 
 			// Test
