@@ -204,12 +204,77 @@ func TestJoin(t *testing.T) {
 			s, _ := NewService()
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
-			// defer func() { writeHold = []string{} }()
 			writeErr = tc.writeErr
 			var err error
 			for _, c := range tc.channels {
 				err = s.Join(c)
 			}
+			if tc.outErr == nil {
+				assert.Nil(t, err, "got unexpected err %v", err)
+				assert.Len(t, s.Channels, len(tc.expectedChannels), "got different length array")
+				for _, c := range tc.expectedChannels {
+					_, ok := s.Channels[c]
+					assert.True(t, ok, "missing %s", c)
+				}
+			} else {
+				assert.NotNil(t, err, "got nil err, but was expecting %v", tc.outErr)
+				assert.EqualError(t, tc.outErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestPart(t *testing.T) {
+	testcases := map[string]struct {
+		channels         []string
+		toDelete         []string
+		expectedChannels []string
+		writeErr         error
+		outErr           error
+	}{
+		"No channel name supplied": {
+			channels:         []string{"fake-channel"},
+			expectedChannels: []string{"fake-channel"},
+			toDelete:         []string{""},
+		},
+		"Part error": {
+			channels: []string{"fake-channel"},
+			toDelete: []string{"fake-channel"},
+			writeErr: fmt.Errorf("fake-write-error"),
+			outErr:   fmt.Errorf("channel part error fake-write-error"),
+		},
+		"Single channel": {
+			channels: []string{"fake-channel"},
+			toDelete: []string{"fake-channel"},
+		},
+		"Multiple channels with duplicate": {
+			toDelete: []string{"fake-channel", "second-fake-channel", "fake-channel"},
+			channels: []string{"fake-channel", "second-fake-channel"},
+		},
+		"Multiple channels with remainder": {
+			toDelete:         []string{"fake-channel", "second-fake-channel"},
+			channels:         []string{"fake-channel", "second-fake-channel", "third-fake-channel"},
+			expectedChannels: []string{"third-fake-channel"},
+		},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			s, _ := NewService()
+			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
+			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
+			// Set up
+			writeErr = nil
+			for _, c := range tc.channels {
+				s.Join(c)
+			}
+
+			// Test
+			writeErr = tc.writeErr
+			var err error
+			for _, c := range tc.toDelete {
+				err = s.Part(c)
+			}
+
 			if tc.outErr == nil {
 				assert.Nil(t, err, "got unexpected err %v", err)
 				assert.Len(t, s.Channels, len(tc.expectedChannels), "got different length array")

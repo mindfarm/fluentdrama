@@ -109,7 +109,7 @@ func (s *service) Login(username, password string) error {
 func (s *service) Join(channel string) error {
 	if channel == "" {
 		// Bail if no channel supplied - it's not an error though
-		log.Printf("No channel name supplied")
+		log.Printf("No channel name to join supplied")
 		return nil
 	}
 	log.Printf("Join channel %s", channel)
@@ -126,7 +126,23 @@ func (s *service) Join(channel string) error {
 
 // Part from the supplied channel
 func (s *service) Part(channel string) error {
-	return fmt.Errorf("not implemented")
+	if channel == "" {
+		// Bail if no channel supplied - it's not an error though
+		log.Printf("No channel name to part supplied")
+		return nil
+	}
+	log.Printf("Part channel %s", channel)
+	if err := s.writer.PrintfLine(fmt.Sprintf("PART %s", channel)); err != nil {
+		return fmt.Errorf("channel part error %w", err)
+	}
+
+	// Remove the channel from the map of channels that the bot has a presence in
+	s.m.Lock()
+	defer s.m.Unlock()
+	if _, ok := s.Channels[channel]; ok {
+		delete(s.Channels, channel)
+	}
+	return nil
 }
 
 // Say the supplied text to the supplied channel
