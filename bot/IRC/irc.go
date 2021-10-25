@@ -64,6 +64,7 @@ func (s *service) Connect(server string, useTLS bool) error {
 	w := bufio.NewWriter(s.connection)
 	s.reader = textproto.NewReader(r)
 	s.writer = textproto.NewWriter(w)
+
 	return nil
 }
 
@@ -82,7 +83,7 @@ func (s *service) Disconnect() error {
 // Login to the server with the supplied credentials
 func (s *service) Login(username, password string) error {
 	if username == "" {
-		return fmt.Errorf("no username supplised for Login, cannot continue")
+		return fmt.Errorf("no username supplied for Login, cannot continue")
 	}
 	if utf8.RuneCountInString(password) < minpasswordlength {
 		return fmt.Errorf("password supplied not long enough, got %d, require %d", utf8.RuneCountInString(password), minpasswordlength)
@@ -144,6 +145,6 @@ func (s *service) Part(channel string) error {
 }
 
 // Say the supplied text to the supplied channel
-func (s *service) Say(output, channel string) error {
+func (s *service) Say(text, channel string) error {
 	return fmt.Errorf("not implemented")
 }

@@ -128,7 +128,7 @@ func TestLogin(t *testing.T) {
 		outErr   error
 	}{
 		"No username": {
-			outErr: fmt.Errorf("no username supplised for Login, cannot continue"),
+			outErr: fmt.Errorf("no username supplied for Login, cannot continue"),
 		},
 		"No password": {
 			username: "fake-user",
