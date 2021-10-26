@@ -143,12 +143,12 @@ func TestLogin(t *testing.T) {
 			username: "fake-user",
 			password: "fake-pass",
 			writeErr: fmt.Errorf("fake-error"),
-			outErr:   fmt.Errorf("login User error fake-error"),
+			outErr:   fmt.Errorf("login USER error fake-error"),
 		},
 		"successful login": {
 			username: "fake-user",
 			password: "fake-pass",
-			written:  []string{"USER fake-user 8 * :fake-user\r\n", "NICK fake-user\r\n", "PRIVMSG NickServ :identify fake-user fake-pass\r\n"},
+			written:  []string{"USER fake-user 8 * :fake-user\r\n", "NICK fake-user\r\n", "PRIVMSG NickServ : identify fake-user fake-pass\r\n"},
 		},
 	}
 
@@ -169,7 +169,7 @@ func TestLogin(t *testing.T) {
 				}
 			} else {
 				assert.NotNil(t, err, "got nil err, but was expecting %v", tc.outErr)
-				assert.EqualError(t, tc.outErr, err.Error())
+				assert.EqualError(t, err, tc.outErr.Error())
 			}
 		})
 	}
@@ -218,7 +218,7 @@ func TestJoin(t *testing.T) {
 				}
 			} else {
 				assert.NotNil(t, err, "got nil err, but was expecting %v", tc.outErr)
-				assert.EqualError(t, tc.outErr, err.Error())
+				assert.EqualError(t, err, tc.outErr.Error())
 			}
 		})
 	}
@@ -284,8 +284,73 @@ func TestPart(t *testing.T) {
 				}
 			} else {
 				assert.NotNil(t, err, "got nil err, but was expecting %v", tc.outErr)
-				assert.EqualError(t, tc.outErr, err.Error())
+				assert.EqualError(t, err, tc.outErr.Error())
 			}
+		})
+	}
+}
+
+func TestParseLine(t *testing.T) {
+	testcases := map[string]struct {
+		input     string
+		prefix    string
+		command   string
+		trailing  string
+		cmdParams string
+	}{
+		"no colon prefix": {
+			input:     "PING :zirconium.libera.chat",
+			prefix:    "",
+			command:   "PING",
+			trailing:  "zirconium.libera.chat",
+			cmdParams: "",
+		},
+		"colon prefix": {
+			input:     ":zirconium.libera.chat 376 loggingbot :End of /MOTD command.",
+			prefix:    "zirconium.libera.chat",
+			command:   "376",
+			trailing:  "End of /MOTD command.",
+			cmdParams: "loggingbot",
+		},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			s, _ := NewService()
+			output := s.parseline(tc.input)
+			assert.Equal(t, tc.prefix, output[0])
+			assert.Equal(t, tc.command, output[1])
+			assert.Equal(t, tc.trailing, output[2])
+			assert.Equal(t, tc.cmdParams, output[3])
+		})
+	}
+}
+
+func TestProcessLine(t *testing.T) {
+	testcases := map[string]struct {
+		input    string
+		writeErr error
+	}{
+		"ping": {
+			input: "PING :zirconium.libera.chat",
+		},
+		"376": {
+			input: ":zirconium.libera.chat 376 loggingbot :End of /MOTD command.",
+		},
+		"privmsg": {
+			input: ":b0nn!~shane@user/b0nn PRIVMSG loggingbot :8",
+		},
+		"channel message": {},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			s, _ := NewService()
+			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
+			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
+			writeErr = nil
+
+			// Test
+			writeErr = tc.writeErr
+			s.processLine(tc.input)
 		})
 	}
 }

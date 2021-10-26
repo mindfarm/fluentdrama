@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/textproto"
+	"strings"
 	"sync"
 	"unicode/utf8"
 )
@@ -88,18 +89,16 @@ func (s *service) Login(username, password string) error {
 	if utf8.RuneCountInString(password) < minpasswordlength {
 		return fmt.Errorf("password supplied not long enough, got %d, require %d", utf8.RuneCountInString(password), minpasswordlength)
 	}
-	err := s.writer.PrintfLine("USER %s 8 * :%s", username, username)
-	if err != nil {
-		return fmt.Errorf("login User error %w", err)
+	if err := s.writer.PrintfLine("USER %s 8 * :%s", username, username); err != nil {
+		return fmt.Errorf("login USER error %w", err)
 	}
-	err = s.writer.PrintfLine("NICK %s", username)
-	if err != nil {
-		return fmt.Errorf("login Nick error %w", err)
+	if err := s.writer.PrintfLine("NICK %s", username); err != nil {
+		return fmt.Errorf("login NICK error %w", err)
 	}
-	str := fmt.Sprintf("PRIVMSG NickServ :identify %s %s", username, password)
+	log.Printf("PRIVMSG NickServ : identify %s %s", username, password)
+	str := fmt.Sprintf("PRIVMSG NickServ : identify %s %s", username, password)
 	log.Printf("nick: %q password: '******' identify", username)
-	err = s.writer.PrintfLine(str)
-	if err != nil {
+	if err := s.writer.PrintfLine(str); err != nil {
 		return fmt.Errorf("login identify error %w", err)
 	}
 	return nil
@@ -147,4 +146,59 @@ func (s *service) Part(channel string) error {
 // Say the supplied text to the supplied channel
 func (s *service) Say(text, channel string) error {
 	return fmt.Errorf("not implemented")
+}
+
+func (s *service) Listen() {
+	for {
+		line, err := s.reader.ReadLine()
+		if err != nil {
+			log.Printf("Error reading socket %v", err)
+			log.Fatal()
+		}
+		s.processLine(line)
+	}
+}
+
+func (s *service) processLine(line string) {
+	log.Println(line)
+	switch s.parseline(line)[1] {
+	case "376":
+		log.Println("THIS IS A JOIN")
+	case "PING":
+		out := strings.Replace(line, "PING", "PONG", -1)
+		if err := s.writer.PrintfLine(out); err != nil {
+			log.Printf("Error %v when writing %s", err, out)
+		}
+		log.Println(out)
+	case "PRIVMSG", "JOIN":
+		log.Println("I have recieved a PRIVMSG")
+	}
+}
+
+func (s *service) parseline(line string) []string {
+	prefixEnd := -1
+	var Prefix, Command, Trailing, CmdParams string
+
+	if strings.HasPrefix(line, ":") {
+		prefixEnd = strings.Index(line, " ")
+		Prefix = line[1:prefixEnd]
+	}
+
+	trailingStart := strings.Index(line, " :")
+	if trailingStart >= 0 {
+		Trailing = line[trailingStart+2:]
+	} else {
+		trailingStart = len(line) - 1
+	}
+
+	cmdAndParams := strings.Fields(line[(prefixEnd + 1) : trailingStart+1])
+	if len(cmdAndParams) > 0 {
+		Command = cmdAndParams[0]
+	}
+
+	if len(cmdAndParams) > 1 {
+		CmdParams = strings.Join(cmdAndParams[1:], "")
+	}
+
+	return []string{Prefix, Command, Trailing, CmdParams}
 }
