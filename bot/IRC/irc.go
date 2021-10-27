@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -20,15 +21,26 @@ type service struct {
 	reader     *textproto.Reader
 	writer     *textproto.Writer
 	Channels   map[string]struct{}
+	out        chan []byte
 	m          sync.RWMutex
+	Username   string
+	Owner      string
 }
 
 // NewService -
 // ignore returns unexported type linter warning (revive)
 // nolint:revive
-func NewService() (*service, error) {
+func NewService(owner string, out chan []byte) (*service, error) {
+	if owner == "" {
+		return nil, fmt.Errorf("no owner supplied")
+	}
+	if out == nil {
+		return nil, fmt.Errorf("no out channel supplied")
+	}
 	return &service{
 		Channels: map[string]struct{}{},
+		Owner:    owner,
+		out:      out,
 	}, nil
 }
 
@@ -89,16 +101,18 @@ func (s *service) Login(username, password string) error {
 	if utf8.RuneCountInString(password) < minpasswordlength {
 		return fmt.Errorf("password supplied not long enough, got %d, require %d", utf8.RuneCountInString(password), minpasswordlength)
 	}
+
 	if err := s.writer.PrintfLine("USER %s 8 * :%s", username, username); err != nil {
 		return fmt.Errorf("login USER error %w", err)
 	}
+
 	if err := s.writer.PrintfLine("NICK %s", username); err != nil {
 		return fmt.Errorf("login NICK error %w", err)
 	}
-	log.Printf("PRIVMSG NickServ : identify %s %s", username, password)
-	str := fmt.Sprintf("PRIVMSG NickServ : identify %s %s", username, password)
-	log.Printf("nick: %q password: '******' identify", username)
-	if err := s.writer.PrintfLine(str); err != nil {
+
+	s.Username = username
+	authStr := fmt.Sprintf("PRIVMSG NickServ : identify %s %s", username, password)
+	if err := s.writer.PrintfLine(authStr); err != nil {
 		return fmt.Errorf("login identify error %w", err)
 	}
 	return nil
@@ -112,6 +126,7 @@ func (s *service) Join(channel string) error {
 		log.Printf("No channel name to join supplied")
 		return nil
 	}
+
 	log.Printf("Join channel %s", channel)
 	if err := s.writer.PrintfLine(fmt.Sprintf("JOIN %s", channel)); err != nil {
 		return fmt.Errorf("channel join error %w", err)
@@ -131,6 +146,7 @@ func (s *service) Part(channel string) error {
 		log.Printf("No channel name to part supplied")
 		return nil
 	}
+
 	log.Printf("Part channel %s", channel)
 	if err := s.writer.PrintfLine(fmt.Sprintf("PART %s", channel)); err != nil {
 		return fmt.Errorf("channel part error %w", err)
@@ -144,8 +160,13 @@ func (s *service) Part(channel string) error {
 }
 
 // Say the supplied text to the supplied channel
-func (s *service) Say(text, channel string) error {
-	return fmt.Errorf("not implemented")
+func (s *service) Say(target, text string) error {
+	s2 := fmt.Sprintf("%s %s : %s", "PRIVMSG", target, text)
+	if err := s.writer.PrintfLine(s2); err != nil {
+		return fmt.Errorf("cannot say %s to %s because error %w", text, target, err)
+	}
+	log.Printf("Say %s to %s", text, target)
+	return nil
 }
 
 func (s *service) Listen() {
@@ -160,18 +181,66 @@ func (s *service) Listen() {
 }
 
 func (s *service) processLine(line string) {
-	log.Println(line)
-	switch s.parseline(line)[1] {
+	parsed := s.parseline(line)
+	switch parsed[1] {
 	case "376":
-		log.Println("THIS IS A JOIN")
+		// 376 is the end of the MOTD
+		for c := range s.Channels {
+			if err := s.Join(c); err != nil {
+				log.Printf("Error joining channel %q, %v", c, err)
+			}
+		}
 	case "PING":
 		out := strings.Replace(line, "PING", "PONG", -1)
 		if err := s.writer.PrintfLine(out); err != nil {
 			log.Printf("Error %v when writing %s", err, out)
 		}
-		log.Println(out)
 	case "PRIVMSG", "JOIN":
-		log.Println("I have recieved a PRIVMSG")
+		log.Print("Message: ", parsed)
+		// messages directed at the bot
+		if parsed[3] == s.Username {
+			log.Println("For me")
+			// Commands from the owner
+			if parsed[0] == s.Owner {
+				log.Println("Commands")
+				str := strings.Split(parsed[2], " ")
+				switch strings.ToLower(str[0]) {
+				case "join":
+					if err := s.Join(str[1]); err != nil {
+						log.Println("join error", err)
+					}
+				case "part":
+					if err := s.Part(str[1]); err != nil {
+						log.Println("part error", err)
+					}
+				case "say":
+					if err := s.Say(str[1], strings.Join(str[2:], " ")); err != nil {
+						log.Println("say error", err)
+					}
+				}
+			} else {
+				log.Println("Passing message on to owner for them to deal with")
+				// pass the message on to the owner
+				owner := strings.Split(parsed[0], "!")
+				if err := s.Say(owner[0], fmt.Sprint("Got this message ", parsed[2])); err != nil {
+					log.Printf("error %v", err)
+				}
+			}
+		} else {
+			log.Println("Putting message onto cheannle")
+			log.Println(line)
+			data, err := json.Marshal(
+				map[string]string{
+					"Prefix":    parsed[0],
+					"Command":   parsed[1],
+					"Trailing":  parsed[2],
+					"CmdParams": parsed[3],
+				})
+			if err != nil {
+				log.Printf("Error marshalling parsed %#v %v", parsed, err)
+			}
+			s.out <- data
+		}
 	}
 }
 
@@ -200,5 +269,6 @@ func (s *service) parseline(line string) []string {
 		CmdParams = strings.Join(cmdAndParams[1:], "")
 	}
 
+	fmt.Println(Prefix, Command, Trailing, CmdParams)
 	return []string{Prefix, Command, Trailing, CmdParams}
 }

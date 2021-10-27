@@ -1,6 +1,7 @@
 package IRC_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/mindfarm/fluentdrama/bot/IRC"
@@ -9,13 +10,26 @@ import (
 
 func TestNewService(t *testing.T) {
 	testcases := map[string]struct {
+		outChan  chan []byte
+		owner    string
 		outError error
 	}{
-		"Happy path": {},
+		"Happy path": {
+			owner:   "fake-owner",
+			outChan: make(chan []byte),
+		},
+		"No owner": {
+			outChan:  make(chan []byte),
+			outError: fmt.Errorf("no owner supplied"),
+		},
+		"No out channel": {
+			owner:    "fake-owner",
+			outError: fmt.Errorf("no out channel supplied"),
+		},
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			service, err := IRC.NewService()
+			service, err := IRC.NewService(tc.owner, tc.outChan)
 			if tc.outError == nil {
 				// no error expected, but a service is
 				assert.Nil(t, err, "No error expected, but got %v", err)

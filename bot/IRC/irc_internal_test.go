@@ -3,6 +3,7 @@ package IRC
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/textproto"
@@ -55,14 +56,10 @@ func TestConnect(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Fake functions for testing
 			netDial = func(network, address string) (net.Conn, error) {
-				// the net.Conn will always be nil because we don't need to
-				// check if one actually formed
 				return nil, tc.dialErr
 			}
 			defer func() { netDial = net.Dial }()
 			tlsDial = func(network, addr string, config *tls.Config) (*tls.Conn, error) {
-				// the tls.Conn will always be nil because we don't need to
-				// check if one actually formed
 				return nil, tc.dialErr
 			}
 			defer func() { tlsDial = tls.Dial }()
@@ -71,7 +68,8 @@ func TestConnect(t *testing.T) {
 			}
 			defer func() { tlsLoadX509KeyPair = tls.LoadX509KeyPair }()
 
-			s, _ := NewService()
+			out := make(chan []byte)
+			s, _ := NewService("fake-owner", out)
 			err := s.Connect(tc.server, tc.useTLS)
 			if tc.outErr == nil {
 				assert.Nil(t, err, "got unexpected err %v", err)
@@ -103,7 +101,8 @@ func TestDisconnect(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			s, _ := NewService()
+			out := make(chan []byte)
+			s, _ := NewService("fake-owner", out)
 			s.connection = &fakeConn{}
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			closeErr = tc.closeErr
@@ -154,7 +153,8 @@ func TestLogin(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			s, _ := NewService()
+			out := make(chan []byte)
+			s, _ := NewService("fake-owner", out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			writeHold = []string{}
@@ -201,7 +201,8 @@ func TestJoin(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			s, _ := NewService()
+			out := make(chan []byte)
+			s, _ := NewService("fake-owner", out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			writeErr = tc.writeErr
@@ -259,7 +260,8 @@ func TestPart(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			s, _ := NewService()
+			out := make(chan []byte)
+			s, _ := NewService("fake-owner", out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			// Set up
@@ -315,7 +317,8 @@ func TestParseLine(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			s, _ := NewService()
+			out := make(chan []byte)
+			s, _ := NewService("fake-owner", out)
 			output := s.parseline(tc.input)
 			assert.Equal(t, tc.prefix, output[0])
 			assert.Equal(t, tc.command, output[1])
@@ -329,21 +332,33 @@ func TestProcessLine(t *testing.T) {
 	testcases := map[string]struct {
 		input    string
 		writeErr error
+		expected []string
 	}{
-		"ping": {
-			input: "PING :zirconium.libera.chat",
+		/*
+				"ping": {
+					input: "PING :zirconium.libera.chat",
+				},
+				"376": {
+					input: ":zirconium.libera.chat 376 loggingbot :End of /MOTD command.",
+				},
+			"privmsg": {
+				input: ":fake-nick!~fake-name@user/fake-nickPRIVMSG loggingbot :8",
+			},
+		*/
+		"channel message": {
+			input: ":fake-nick!~fake-name@user/fake-nick PRIVMSG #fake-channel :fake-trailing message data",
+			expected: []string{
+				"fake-nick!~fake-name@user/fake-nick",
+				"PRIVMSG",
+				"fake-trailing message data",
+				"#fake-channel",
+			},
 		},
-		"376": {
-			input: ":zirconium.libera.chat 376 loggingbot :End of /MOTD command.",
-		},
-		"privmsg": {
-			input: ":b0nn!~shane@user/b0nn PRIVMSG loggingbot :8",
-		},
-		"channel message": {},
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			s, _ := NewService()
+			out := make(chan []byte, 1) // Note: buffer is for testing only
+			s, _ := NewService("fake-owner", out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			writeErr = nil
@@ -351,6 +366,15 @@ func TestProcessLine(t *testing.T) {
 			// Test
 			writeErr = tc.writeErr
 			s.processLine(tc.input)
+			output := <-s.out
+			expected, _ := json.Marshal(
+				map[string]string{
+					"Prefix":    tc.expected[0],
+					"Command":   tc.expected[1],
+					"Trailing":  tc.expected[2],
+					"CmdParams": tc.expected[3],
+				})
+			assert.Equal(t, expected, output)
 		})
 	}
 }
