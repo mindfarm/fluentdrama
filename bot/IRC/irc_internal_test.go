@@ -328,25 +328,48 @@ func TestParseLine(t *testing.T) {
 	}
 }
 
+// TODO - refactor so these tests have actual meaning
 func TestProcessLine(t *testing.T) {
 	testcases := map[string]struct {
-		input    string
-		writeErr error
-		expected []string
+		input      string
+		writeErr   error
+		expected   []string
+		useChannel bool
+		useWriter  bool
+		writeHold  []string
 	}{
+		"ping": {
+			input:     "PING :zirconium.libera.chat",
+			writeHold: []string{"PONG :zirconium.libera.chat\r\n"},
+			useWriter: true,
+		},
+		"376": {
+			input: ":zirconium.libera.chat 376 loggingbot :End of /MOTD command.",
+		},
+		"part": {
+			input: "fake-owner!~fake-name@user/fake-owner PART  #fake-channel",
+		},
 		/*
-				"ping": {
-					input: "PING :zirconium.libera.chat",
-				},
-				"376": {
-					input: ":zirconium.libera.chat 376 loggingbot :End of /MOTD command.",
-				},
-			"privmsg": {
-				input: ":fake-nick!~fake-name@user/fake-nickPRIVMSG loggingbot :8",
-			},
+			//
 		*/
+		"privmsg to bot command": {
+			input: ":fake-owner!~fake-name@user/fake-owner PRIVMSG fake-user :8",
+		},
+		"privmsg to bot from non-owner": {
+			input: ":fake-nick!~fake-name@user/fake-nick PRIVMSG fake-user :8",
+		},
+		"privmsg to bot command (join)": {
+			input: ":fake-owner!~fake-name@user/fake-owner PRIVMSG fake-user :join #second-fake-channel",
+		},
+		"privmsg to bot command (part)": {
+			input: ":fake-owner!~fake-name@user/fake-owner PRIVMSG fake-user :part #second-fake-channel",
+		},
+		"privmsg to bot command (say)": {
+			input: ":fake-owner!~fake-name@user/fake-owner PRIVMSG fake-user :say fake-target fake message",
+		},
 		"channel message": {
-			input: ":fake-nick!~fake-name@user/fake-nick PRIVMSG #fake-channel :fake-trailing message data",
+			useChannel: true,
+			input:      ":fake-nick!~fake-name@user/fake-nick PRIVMSG #fake-channel :fake-trailing message data",
 			expected: []string{
 				"fake-nick!~fake-name@user/fake-nick",
 				"PRIVMSG",
@@ -358,23 +381,78 @@ func TestProcessLine(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			out := make(chan []byte, 1) // Note: buffer is for testing only
+			s, _ := NewService("fake-owner!~fake-name@user/fake-owner", out)
+			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
+			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
+			s.Username = "fake-user"
+			writeErr = nil
+			writeHold = []string{}
+			// Test
+			writeErr = tc.writeErr
+			s.processLine(tc.input)
+			if tc.useChannel {
+				output := <-s.out
+				expected, _ := json.Marshal(
+					map[string]string{
+						"Prefix":    tc.expected[0],
+						"Command":   tc.expected[1],
+						"Trailing":  tc.expected[2],
+						"CmdParams": tc.expected[3],
+					})
+				assert.Equal(t, expected, output)
+			}
+			if tc.useWriter {
+				assert.Equal(t, len(tc.writeHold), len(writeHold))
+				for i := range tc.writeHold {
+					assert.Equal(t, tc.writeHold[i], writeHold[i])
+				}
+			}
+		})
+	}
+}
+
+func TestSay(t *testing.T) {
+	testcases := map[string]struct {
+		target   string
+		text     string
+		outErr   error
+		writeErr error
+	}{
+		"no target": {
+			outErr: fmt.Errorf("say has no target supplied"),
+		},
+		"no text": {
+			target: "fake-target",
+			outErr: fmt.Errorf("say has no text supplied"),
+		},
+		"write error": {
+			target:   "fake-target",
+			text:     "fake-text",
+			writeErr: fmt.Errorf("fake-write error"),
+			outErr:   fmt.Errorf("cannot say fake-text to fake-target because error fake-write error"),
+		},
+		"happy path": {target: "fake-target", text: "fake-text"},
+	}
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			out := make(chan []byte)
 			s, _ := NewService("fake-owner", out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
+			// Set up
 			writeErr = nil
 
 			// Test
 			writeErr = tc.writeErr
-			s.processLine(tc.input)
-			output := <-s.out
-			expected, _ := json.Marshal(
-				map[string]string{
-					"Prefix":    tc.expected[0],
-					"Command":   tc.expected[1],
-					"Trailing":  tc.expected[2],
-					"CmdParams": tc.expected[3],
-				})
-			assert.Equal(t, expected, output)
+			err := s.Say(tc.target, tc.text)
+
+			if tc.outErr == nil {
+				assert.Nil(t, err, "got unexpected err %v", err)
+			} else {
+				assert.NotNil(t, err, "got nil err, but was expecting %v", tc.outErr)
+				assert.EqualError(t, err, tc.outErr.Error())
+			}
 		})
 	}
+
 }

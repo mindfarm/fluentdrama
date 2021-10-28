@@ -161,6 +161,12 @@ func (s *service) Part(channel string) error {
 
 // Say the supplied text to the supplied channel
 func (s *service) Say(target, text string) error {
+	if target == "" {
+		return fmt.Errorf("say has no target supplied")
+	}
+	if text == "" {
+		return fmt.Errorf("say has no text supplied")
+	}
 	s2 := fmt.Sprintf("%s %s : %s", "PRIVMSG", target, text)
 	if err := s.writer.PrintfLine(s2); err != nil {
 		return fmt.Errorf("cannot say %s to %s because error %w", text, target, err)
@@ -196,13 +202,10 @@ func (s *service) processLine(line string) {
 			log.Printf("Error %v when writing %s", err, out)
 		}
 	case "PRIVMSG", "JOIN":
-		log.Print("Message: ", parsed)
 		// messages directed at the bot
 		if parsed[3] == s.Username {
-			log.Println("For me")
-			// Commands from the owner
 			if parsed[0] == s.Owner {
-				log.Println("Commands")
+				// Commands from the owner
 				str := strings.Split(parsed[2], " ")
 				switch strings.ToLower(str[0]) {
 				case "join":
@@ -219,7 +222,6 @@ func (s *service) processLine(line string) {
 					}
 				}
 			} else {
-				log.Println("Passing message on to owner for them to deal with")
 				// pass the message on to the owner
 				owner := strings.Split(parsed[0], "!")
 				if err := s.Say(owner[0], fmt.Sprint("Got this message ", parsed[2])); err != nil {
@@ -227,7 +229,7 @@ func (s *service) processLine(line string) {
 				}
 			}
 		} else {
-			log.Println("Putting message onto cheannle")
+			log.Println("Putting message onto channel")
 			log.Println(line)
 			data, err := json.Marshal(
 				map[string]string{
