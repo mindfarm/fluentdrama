@@ -65,14 +65,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to login with the following issue: %v", err)
 	}
-	time.Sleep(5 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	// Example of telling the bot to join a channel
-	channel := "#examplechannel"
+	channel := "#libera-cloak"
 	if err := s.Join(channel); err != nil {
 		log.Printf("Unable to join channel %s", channel)
 	} else {
-		if err := s.Say(channel, "This channel is now logged"); err != nil {
+		if err := s.Say(channel, "!cloakme"); err != nil {
 			log.Println("error sending join message", err)
 		}
 	}
