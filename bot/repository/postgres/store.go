@@ -78,10 +78,10 @@ func (p *pgCustomerRepo) GetChannels(ctx context.Context) ([]string, error) {
 }
 
 // AddLog -
-func (p *pgCustomerRepo) AddLog(ctx context.Context, channel, username, said string) error {
-	_, err := p.dbHandler.Query(ctx, `INSERT INTO logs(channel, username,  said) VALUES($1, $2, $3)`, channel, username, said)
+func (p *pgCustomerRepo) AddLog(ctx context.Context, channel, nick, said string) error {
+	_, err := p.dbHandler.Query(ctx, `INSERT INTO logs(channel, nick,  said) VALUES($1, $2, $3)`, channel, nick, said)
 	if err != nil {
-		return fmt.Errorf("adding log %q %q %q produced %w", channel, username, said, err)
+		return fmt.Errorf("adding log %q %q %q produced %w", channel, nick, said, err)
 	}
 	return err
 }
