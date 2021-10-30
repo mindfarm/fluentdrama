@@ -7,50 +7,42 @@ import (
 	"log"
 	"time"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	//"github.com/jackc/pgx/v4/pgxpool"
+	_ "github.com/lib/pq" //nolint:revive
 )
 
 type pgCustomerRepo struct {
-	dbHandler *pgxpool.Pool
+	//dbHandler *pgxpool.Pool
+	dbHandler *sql.DB
 }
 
 // NewPgCustomerRepo -
 // Ignore unexpected type linter issue
 // nolint:revive
 func NewPgCustomerRepo(connString string) (*pgCustomerRepo, error) {
-	config, err := pgxpool.ParseConfig(connString)
+	//config, err := pgxpool.ParseConfig(connString)
+	conn, err := sql.Open("postgres", connString)
 	if err != nil {
 		return nil, err
 
 	}
+
 	/*
-		config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-			conn.ConnInfo().RegisterDataType(pgtype.DataType{
-				Value: &MyTid{&pgtype.TID{}},
-
-				Name: "tid",
-				OID:  pgtype.TIDOID,
-			})
-			return nil
-
+		db, err := pgxpool.ConnectConfig(context.Background(), config)
+		if err != nil {
+			return nil, err
 		}
 	*/
 
-	db, err := pgxpool.ConnectConfig(context.Background(), config)
-	if err != nil {
-		return nil, err
-
-	}
-
 	return &pgCustomerRepo{
-		dbHandler: db,
+		dbHandler: conn,
 	}, nil
 
 }
 
 // AddChannel -
 func (p *pgCustomerRepo) AddChannel(ctx context.Context, channel string) error {
-	_, err := p.dbHandler.Query(ctx, `INSERT INTO channels(name) VALUES($1)`, channel)
+	_, err := p.dbHandler.Query(`INSERT INTO channels(name) VALUES($1)`, channel)
 	if err != nil {
 		return fmt.Errorf("adding channel %q produced %w", channel, err)
 	}
@@ -59,7 +51,7 @@ func (p *pgCustomerRepo) AddChannel(ctx context.Context, channel string) error {
 
 // GetChannels -
 func (p *pgCustomerRepo) GetChannels(ctx context.Context) ([]string, error) {
-	rows, err := p.dbHandler.Query(ctx, `SELECT name from channels`)
+	rows, err := p.dbHandler.Query(`SELECT name from channels`)
 	if err != nil {
 		return nil, fmt.Errorf(`unable to fetch channels with error %w`, err)
 	}
@@ -79,7 +71,7 @@ func (p *pgCustomerRepo) GetChannels(ctx context.Context) ([]string, error) {
 
 // AddLog -
 func (p *pgCustomerRepo) AddLog(ctx context.Context, channel, nick, said string) error {
-	_, err := p.dbHandler.Query(ctx, `INSERT INTO logs(channel, nick,  said) VALUES($1, $2, $3)`, channel, nick, said)
+	_, err := p.dbHandler.Query(`INSERT INTO logs(channel, nick,  said) VALUES($1, $2, $3)`, channel, nick, said)
 	if err != nil {
 		return fmt.Errorf("adding log %q %q %q produced %w", channel, nick, said, err)
 	}
@@ -88,7 +80,7 @@ func (p *pgCustomerRepo) AddLog(ctx context.Context, channel, nick, said string)
 
 // GetChannelLogsByTime -
 func (p *pgCustomerRepo) GetChannelLogsByTime(ctx context.Context, channel string, start, finish time.Time) ([]map[string]string, error) {
-	rows, err := p.dbHandler.Query(ctx, `SELECT  nick, stamp, said FROM channels WHERE channel=$1 stamp BETWEEN $2 AND $3`, channel, start, finish)
+	rows, err := p.dbHandler.Query(`SELECT  nick, stamp, said FROM channels WHERE channel=$1 stamp BETWEEN $2 AND $3`, channel, start, finish)
 	if err != nil {
 		return nil, fmt.Errorf(`unable to fetch channels with error %w`, err)
 	}
