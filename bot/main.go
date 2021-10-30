@@ -1,15 +1,24 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mindfarm/fluentdrama/bot/IRC"
+	data "github.com/mindfarm/fluentdrama/bot/repository/postgres"
 )
 
 func main() {
+	dbURI, ok := os.LookupEnv("DBURI")
+	if !ok {
+		log.Fatalf("DBURI is not set")
+	}
+
 	owner, ok := os.LookupEnv("BOT_OWNER")
 	if !ok {
 		log.Fatal("env var BOT_OWNER not set, cannot continue")
@@ -40,21 +49,61 @@ func main() {
 		log.Fatal("env var IRC_PASSWORD not set, cannot continue")
 	}
 
+	// Datastore
+	ds, err := data.NewPgCustomerRepo(dbURI)
+	if err != nil {
+		log.Fatalf("Unable to connect to datastore with error %v", err)
+	}
+	fmt.Println(ds)
+	channels, err := ds.GetChannels(context.Background())
+	if err != nil {
+		log.Printf("error fetching channels %v", err)
+	}
+
 	// Create an instance of the server
-	out := make(chan []byte)
-	s, err := IRC.NewService(owner, out)
+	out := make(chan map[string]string)
+	s, err := IRC.NewService(owner, channels, out)
 	if err != nil {
 		panic(err)
 	}
 
+	// Connect to the server
 	if err = s.Connect(server, secureBool); err != nil {
 		log.Fatalf("Could not connect to server with error %v", err)
 	}
+
 	go s.Listen()
+	// m := map[string]string{}
 	go func() {
 		// Just dump the output for now
 		for {
-			log.Println(string(<-out))
+			m := <-out
+			log.Printf("%#v", m)
+			c, ok := m["Command"]
+			if !ok {
+				log.Printf("No command detected in %#v", m)
+				continue
+			}
+			switch strings.ToUpper(c) {
+			case "JOIN":
+				if p, ok := m["Prefix"]; ok && strings.Split(p, "!")[0] == username {
+					if err = ds.AddChannel(context.Background(), m["CmdParams"]); err != nil {
+						log.Printf("Error adding channel %s %v", c, err)
+					} else {
+						log.Println("Successfully added channel ", c)
+					}
+				}
+			case "PRIVMSG":
+				// log channel messagesAddLog(ctx context.Context, channel, username, said string) error
+				// ignore private messages sent to the bot
+				if cp, ok := m["CmdParams"]; ok && strings.Split(cp, "!")[0] != username {
+					if err = ds.AddLog(context.Background(), m["CmdParams"], strings.Split(m["Prefix"], "!")[0], m["Trailing"]); err != nil {
+						log.Printf("Error adding log %#v %v", m, err)
+					} else {
+						log.Println("Successfully added log ", m)
+					}
+				}
+			}
 		}
 	}()
 
@@ -66,17 +115,6 @@ func main() {
 		log.Fatalf("Unable to login with the following issue: %v", err)
 	}
 	time.Sleep(15 * time.Second)
-
-	// Example of telling the bot to join a channel
-	channel := "#libera-cloak"
-	if err := s.Join(channel); err != nil {
-		log.Printf("Unable to join channel %s", channel)
-	} else {
-		if err := s.Say(channel, "!cloakme"); err != nil {
-			log.Println("error sending join message", err)
-		}
-	}
-
 	// hold the main thread open forever
 	select {}
 }

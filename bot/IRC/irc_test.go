@@ -10,16 +10,16 @@ import (
 
 func TestNewService(t *testing.T) {
 	testcases := map[string]struct {
-		outChan  chan []byte
+		outChan  chan map[string]string
 		owner    string
 		outError error
 	}{
 		"Happy path": {
 			owner:   "fake-owner",
-			outChan: make(chan []byte),
+			outChan: make(chan map[string]string),
 		},
 		"No owner": {
-			outChan:  make(chan []byte),
+			outChan:  make(chan map[string]string),
 			outError: fmt.Errorf("no owner supplied"),
 		},
 		"No out channel": {
@@ -29,7 +29,7 @@ func TestNewService(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			service, err := IRC.NewService(tc.owner, tc.outChan)
+			service, err := IRC.NewService(tc.owner, []string{}, tc.outChan)
 			if tc.outError == nil {
 				// no error expected, but a service is
 				assert.Nil(t, err, "No error expected, but got %v", err)

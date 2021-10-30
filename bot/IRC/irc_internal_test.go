@@ -3,7 +3,6 @@ package IRC
 import (
 	"bufio"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/textproto"
@@ -68,8 +67,8 @@ func TestConnect(t *testing.T) {
 			}
 			defer func() { tlsLoadX509KeyPair = tls.LoadX509KeyPair }()
 
-			out := make(chan []byte)
-			s, _ := NewService("fake-owner", out)
+			out := make(chan map[string]string)
+			s, _ := NewService("fake-owner", []string{}, out)
 			err := s.Connect(tc.server, tc.useTLS)
 			if tc.outErr == nil {
 				assert.Nil(t, err, "got unexpected err %v", err)
@@ -101,8 +100,8 @@ func TestDisconnect(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			out := make(chan []byte)
-			s, _ := NewService("fake-owner", out)
+			out := make(chan map[string]string)
+			s, _ := NewService("fake-owner", []string{}, out)
 			s.connection = &fakeConn{}
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			closeErr = tc.closeErr
@@ -153,8 +152,8 @@ func TestLogin(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			out := make(chan []byte)
-			s, _ := NewService("fake-owner", out)
+			out := make(chan map[string]string)
+			s, _ := NewService("fake-owner", []string{}, out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			writeHold = []string{}
@@ -201,8 +200,8 @@ func TestJoin(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			out := make(chan []byte)
-			s, _ := NewService("fake-owner", out)
+			out := make(chan map[string]string)
+			s, _ := NewService("fake-owner", []string{}, out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			writeErr = tc.writeErr
@@ -260,8 +259,8 @@ func TestPart(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			out := make(chan []byte)
-			s, _ := NewService("fake-owner", out)
+			out := make(chan map[string]string)
+			s, _ := NewService("fake-owner", []string{}, out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			// Set up
@@ -317,8 +316,8 @@ func TestParseLine(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			out := make(chan []byte)
-			s, _ := NewService("fake-owner", out)
+			out := make(chan map[string]string)
+			s, _ := NewService("fake-owner", []string{}, out)
 			output := s.parseline(tc.input)
 			assert.Equal(t, tc.prefix, output[0])
 			assert.Equal(t, tc.command, output[1])
@@ -380,8 +379,8 @@ func TestProcessLine(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			out := make(chan []byte, 1) // Note: buffer is for testing only
-			s, _ := NewService("fake-owner!~fake-name@user/fake-owner", out)
+			out := make(chan map[string]string, 1) // Note: buffer is for testing only
+			s, _ := NewService("fake-owner!~fake-name@user/fake-owner", []string{}, out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			s.Username = "fake-user"
@@ -392,13 +391,13 @@ func TestProcessLine(t *testing.T) {
 			s.processLine(tc.input)
 			if tc.useChannel {
 				output := <-s.out
-				expected, _ := json.Marshal(
+				expected :=
 					map[string]string{
 						"Prefix":    tc.expected[0],
 						"Command":   tc.expected[1],
 						"Trailing":  tc.expected[2],
 						"CmdParams": tc.expected[3],
-					})
+					}
 				assert.Equal(t, expected, output)
 			}
 			if tc.useWriter {
@@ -435,8 +434,8 @@ func TestSay(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			out := make(chan []byte)
-			s, _ := NewService("fake-owner", out)
+			out := make(chan map[string]string)
+			s, _ := NewService("fake-owner", []string{}, out)
 			s.reader = textproto.NewReader(bufio.NewReader(&fakeConn{}))
 			s.writer = textproto.NewWriter(bufio.NewWriter(&fakeConn{}))
 			// Set up

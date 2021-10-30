@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"crypto/rand"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -21,7 +20,7 @@ type service struct {
 	reader     *textproto.Reader
 	writer     *textproto.Writer
 	Channels   map[string]struct{}
-	out        chan []byte
+	out        chan map[string]string
 	m          sync.RWMutex
 	Username   string
 	Owner      string
@@ -30,15 +29,21 @@ type service struct {
 // NewService -
 // ignore returns unexported type linter warning (revive)
 // nolint:revive
-func NewService(owner string, out chan []byte) (*service, error) {
+func NewService(owner string, channels []string, out chan map[string]string) (*service, error) {
 	if owner == "" {
 		return nil, fmt.Errorf("no owner supplied")
 	}
 	if out == nil {
 		return nil, fmt.Errorf("no out channel supplied")
 	}
+
+	channelMap := map[string]struct{}{}
+	for _, c := range channels {
+		channelMap[c] = struct{}{}
+	}
+
 	return &service{
-		Channels: map[string]struct{}{},
+		Channels: channelMap,
 		Owner:    owner,
 		out:      out,
 	}, nil
@@ -189,8 +194,8 @@ func (s *service) Listen() {
 func (s *service) processLine(line string) {
 	parsed := s.parseline(line)
 	switch parsed[1] {
-	case "376":
-		// 376 is the end of the MOTD
+	case "396":
+		// 396 is the services alerting that the account is now cloaked
 		for c := range s.Channels {
 			if err := s.Join(c); err != nil {
 				log.Printf("Error joining channel %q, %v", c, err)
@@ -229,19 +234,14 @@ func (s *service) processLine(line string) {
 				}
 			}
 		} else {
-			log.Println("Putting message onto channel")
-			log.Println(line)
-			data, err := json.Marshal(
-				map[string]string{
-					"Prefix":    parsed[0],
-					"Command":   parsed[1],
-					"Trailing":  parsed[2],
-					"CmdParams": parsed[3],
-				})
-			if err != nil {
-				log.Printf("Error marshalling parsed %#v %v", parsed, err)
+			// log.Println("Putting message onto channel")
+			// log.Println(line)
+			s.out <- map[string]string{
+				"Prefix":    parsed[0],
+				"Command":   parsed[1],
+				"Trailing":  parsed[2],
+				"CmdParams": parsed[3],
 			}
-			s.out <- data
 		}
 	}
 }
