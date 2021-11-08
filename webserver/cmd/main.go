@@ -48,6 +48,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	c := handlers.NewHandlerData(ds)
+	mux.Handle("/", http.HandlerFunc(c.Root))
 	mux.Handle("/channels", http.HandlerFunc(c.GetChannels))
 
 	// listen on all interfaces
