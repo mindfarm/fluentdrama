@@ -14,7 +14,6 @@ import (
 )
 
 func main() {
-
 	dbURI, ok := os.LookupEnv("DBURI")
 	if !ok {
 		log.Fatalf("DBURI is not set")
@@ -51,8 +50,8 @@ func main() {
 	mux.Handle("/", http.HandlerFunc(c.Root))
 	mux.Handle("/channels", http.HandlerFunc(c.GetChannels))
 
-	// listen on all interfaces
-	ip := "0.0.0.0"
+	// listen on all localhost
+	ip := "127.0.0.1"
 	server := &http.Server{Addr: ip + ":" + rPort, Handler: mux}
 
 	// Server listens on its own goroutine

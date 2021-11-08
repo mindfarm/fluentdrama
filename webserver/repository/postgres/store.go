@@ -18,7 +18,7 @@ type PGCustomerRepo struct {
 	DbHandler *sql.DB
 }
 
-// NewPgCustomerRepo -
+// NewPGCustomerRepo -
 // Ignore unexpected type linter issue
 // nolint:revive
 func NewPGCustomerRepo(connString string) (*PGCustomerRepo, error) {
@@ -30,7 +30,6 @@ func NewPGCustomerRepo(connString string) (*PGCustomerRepo, error) {
 	return &PGCustomerRepo{
 		DbHandler: conn,
 	}, nil
-
 }
 
 // GetChannels -
@@ -39,6 +38,7 @@ func (p *PGCustomerRepo) GetChannels(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf(`unable to fetch channels with error %w`, err)
 	}
+	defer rows.Close()
 
 	channels := []string{}
 	var channel sql.NullString
@@ -93,6 +93,7 @@ func (p *PGCustomerRepo) GetChannelLogs(ctx context.Context, channel, nick strin
 		// only get the logs for the specified nick
 		rows, err = p.DbHandler.Query(`SELECT  nick, stamp, said FROM logs WHERE channel=$1 AND nick=$2 AND stamp BETWEEN $3 AND $4`, channel, nick, start, finish)
 	}
+	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf(`unable to fetch channels with error %w`, err)
 	}
@@ -126,6 +127,7 @@ func (p *PGCustomerRepo) getBoundary(nick, channel, order string) (time.Time, er
 		query := fmt.Sprintf("SELECT stamp FROM logs WHERE channel=$1  ORDER BY stamp %s LIMIT 1", direction)
 		rows, err = p.DbHandler.Query(query, channel)
 	}
+	defer rows.Close()
 	if err != nil {
 		return time.Time{}, fmt.Errorf(`unable to fetch final time stamp in logs with error %w`, err)
 	}
