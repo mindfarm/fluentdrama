@@ -47,8 +47,8 @@ func main() {
 	mux := http.NewServeMux()
 
 	c := handlers.NewHandlerData(ds)
-	mux.Handle("/", http.HandlerFunc(c.Root))
-	mux.Handle("/channels", http.HandlerFunc(c.GetChannels))
+	mux.Handle("/", AllowCors(http.HandlerFunc(c.Root)))
+	mux.Handle("/channels", AllowCors(http.HandlerFunc(c.GetChannels)))
 
 	// listen on all localhost
 	ip := "127.0.0.1"
@@ -76,4 +76,14 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		log.Fatalf("server shutdown returned error %v", err)
 	}
+}
+
+// AllowCors -
+// CORS middleware
+func AllowCors(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		next.ServeHTTP(w, req)
+	})
 }
