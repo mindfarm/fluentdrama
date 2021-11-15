@@ -115,4 +115,18 @@ func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 		}
 
 	}
+
+	if strings.HasSuffix(r.URL.Path, ".js") {
+		w.Header().Set("Content-Type", "text/javascript")
+		http.ServeFile(w, r, "./assets"+r.URL.Path)
+	} else {
+		w.Header().Set("Content-Type", "text/html")
+		http.ServeFile(w, r, "./assets")
+	}
+	// if we get here the path hasn't been handled by previous code
+	// _, err := w.Write([]byte(index))
+	// if err != nil {
+	// log.Printf("ERROR writing index in root handler %v", err)
+	// return
+	// }
 }
