@@ -24,15 +24,7 @@ func NewPgCustomerRepo(connString string) (*pgCustomerRepo, error) {
 	conn, err := sql.Open("postgres", connString)
 	if err != nil {
 		return nil, err
-
 	}
-
-	/*
-		db, err := pgxpool.ConnectConfig(context.Background(), config)
-		if err != nil {
-			return nil, err
-		}
-	*/
 
 	return &pgCustomerRepo{
 		dbHandler: conn,
