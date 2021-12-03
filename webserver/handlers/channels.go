@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -15,7 +16,7 @@ type handlerData struct {
 	ds *data.PGCustomerRepo
 }
 
-// NewChanData -
+// NewHandlerData -
 // ignore unexported linting error
 // nolint:revive
 func NewHandlerData(ds *data.PGCustomerRepo) *handlerData {
@@ -55,9 +56,8 @@ func (hd *handlerData) GetChannels(w http.ResponseWriter, r *http.Request) {
 const maxQueryLength = 256
 
 // Root route handler - default routes
-func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
+func (hd *handlerData) Logs(w http.ResponseWriter, r *http.Request) {
 	path := []rune(r.URL.Path)
-
 	if len(path) > maxQueryLength {
 		return
 	}
@@ -67,7 +67,7 @@ func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 		// split on '/'
 		chunks := []string{}
 		holder := []rune{}
-		for i := 1; i < len(path); i++ {
+		for i := 0; i < len(path); i++ {
 			if path[i] == '/' {
 				chunks = append(chunks, string(holder))
 				holder = []rune{}
@@ -80,6 +80,7 @@ func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 		}
 		// channel, date, nick, time will be after a ?
 		if len(chunks) == 1 {
+			log.Print("No Date found")
 			// default to today
 			chunks = append(chunks, strings.Split(time.Now().UTC().String(), " ")[0])
 		}
@@ -113,15 +114,20 @@ func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 			log.Printf("ERROR writing logs in GetChannelLogs handler %v", err)
 			return
 		}
-
+		return
 	}
 
+	appLoc, err := os.Executable()
+	if err != nil {
+		log.Printf("ERROR getting the executable path %v", err)
+	}
 	if strings.HasSuffix(r.URL.Path, ".js") {
 		w.Header().Set("Content-Type", "text/javascript")
-		http.ServeFile(w, r, "./assets"+r.URL.Path)
+		http.ServeFile(w, r, appLoc+"/assets"+r.URL.Path)
 	} else {
 		w.Header().Set("Content-Type", "text/html")
-		http.ServeFile(w, r, "./assets")
+		// index.html
+		http.ServeFile(w, r, appLoc+"/assets/index.html")
 	}
 	// if we get here the path hasn't been handled by previous code
 	// _, err := w.Write([]byte(index))

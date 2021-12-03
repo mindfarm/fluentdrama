@@ -25,17 +25,14 @@ func main() {
 		log.Fatalf("Unable to connect to datastore with error %v", err)
 	}
 
-	// h := Handlers{ds: ds.DbHandler}
 	// Get port from env
 	var rPort string
-	// ok := true
 	if rPort, ok = os.LookupEnv("HTTP_PORT"); !ok {
 		log.Fatal("HTTP_PORT required for HTTP server to listen on")
 	}
 
 	// Port validation - has to be converted to an int for the checks
 	var port int
-	// var err error
 	if port, err = strconv.Atoi(rPort); err != nil {
 		log.Fatal("HTTP_PORT must be an integer")
 	}
@@ -47,7 +44,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	c := handlers.NewHandlerData(ds)
-	mux.Handle("/", AllowCors(http.HandlerFunc(c.Root)))
+	mux.Handle("/logs/", http.StripPrefix("/logs/", AllowCors(http.HandlerFunc(c.Logs))))
 	mux.Handle("/channels", AllowCors(http.HandlerFunc(c.GetChannels)))
 
 	// listen on all localhost
