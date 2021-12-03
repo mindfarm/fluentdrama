@@ -88,10 +88,10 @@ func (p *PGCustomerRepo) GetChannelLogs(ctx context.Context, channel, nick strin
 
 	var rows *sql.Rows
 	if nick == "" {
-		rows, err = p.DbHandler.Query(`SELECT  nick, stamp, said FROM logs WHERE channel=$1 AND stamp BETWEEN $2 AND $3`, channel, start, finish)
+		rows, err = p.DbHandler.Query(`SELECT  nick, stamp, said FROM logs WHERE channel=$1 AND stamp BETWEEN $2 AND $3 ORDER BY stamp ASC`, channel, start, finish)
 	} else {
 		// only get the logs for the specified nick
-		rows, err = p.DbHandler.Query(`SELECT  nick, stamp, said FROM logs WHERE channel=$1 AND nick=$2 AND stamp BETWEEN $3 AND $4`, channel, nick, start, finish)
+		rows, err = p.DbHandler.Query(`SELECT  nick, stamp, said FROM logs WHERE channel=$1 AND nick=$2 AND stamp BETWEEN $3 AND $4 ORDER BY stamp ASC`, channel, nick, start, finish)
 	}
 	defer rows.Close()
 	if err != nil {
