@@ -15,7 +15,7 @@ type handlerData struct {
 	ds *data.PGCustomerRepo
 }
 
-// NewChanData -
+// NewHandlerData -
 // ignore unexported linting error
 // nolint:revive
 func NewHandlerData(ds *data.PGCustomerRepo) *handlerData {
@@ -57,13 +57,14 @@ const maxQueryLength = 256
 // Root route handler - default routes
 func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 	path := []rune(r.URL.Path)
-
+	log.Printf("PROCESSING PATH %s", r.URL.Path)
 	if len(path) > maxQueryLength {
 		return
 	}
 
 	// Is this a channel request
 	if len(path) > 1 && (path[0] == '#' || (path[0] == '/' && path[1] == '#')) {
+		log.Printf("Channel request")
 		// split on '/'
 		chunks := []string{}
 		holder := []rune{}
@@ -80,6 +81,7 @@ func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 		}
 		// channel, date, nick, time will be after a ?
 		if len(chunks) == 1 {
+			log.Print("No Date found")
 			// default to today
 			chunks = append(chunks, strings.Split(time.Now().UTC().String(), " ")[0])
 		}
@@ -95,6 +97,7 @@ func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 		if len(chunks) > 2 {
 			nick = chunks[2]
 		}
+		log.Printf("Fetching logs for channel %s", channel)
 		logs, err := hd.ds.GetChannelLogs(context.Background(), channel, nick, date)
 		if err != nil {
 			log.Printf("ERROR getting channel logs: %v", err)
@@ -117,11 +120,13 @@ func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.HasSuffix(r.URL.Path, ".js") {
+		log.Printf("SERVING %s", r.URL.Path)
 		w.Header().Set("Content-Type", "text/javascript")
-		http.ServeFile(w, r, "./assets"+r.URL.Path)
+		http.ServeFile(w, r, "/var/www/irclogserver/assets"+r.URL.Path)
 	} else {
+		log.Print("SERVING INDEX")
 		w.Header().Set("Content-Type", "text/html")
-		http.ServeFile(w, r, "./assets")
+		http.ServeFile(w, r, "/var/www/irclogserver/assets")
 	}
 	// if we get here the path hasn't been handled by previous code
 	// _, err := w.Write([]byte(index))
