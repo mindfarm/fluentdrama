@@ -11,17 +11,21 @@
 		of the GDPR. For further information please read 
 		<a href="https://gdpr-info.eu/art-9-gdpr/">Article 9</a>.
 		</div>
-		<div id="channels" style="width: 10em; border: thin solid red">
-			<div  v-for="chans in channelList">
-				<ul style="list-style: none;">
-					<li v-for="chan in chans" v-on:click="gLogs(chan)">{{ chan }}</li>
+		<div id="channels" style="float:left; border: thin solid
+			blue; max-width: max-content">
+			<div  v-for="chans in channelList" style="text-align: center">
+				Channels
+				<ul style="list-style: none; text-align: left">
+					<li v-for="chan in chans" v-on:click="gLogs(chan)"
+						style="padding-right: 2em">{{ chan }}</li>
 				</ul>
 			</div>
 		</div>
-		<div id="logs">
+		<div id="logs" style="max-height:50em; overflow-y: scroll;
+			overflow-wrap: break-word">
 			<div v-for="logd in logList">
 			<div v-for="l in logd" :key="l.Time">
-				<div class="logdata" v-bind:id="logd.stamp" style="display: contents">
+				<div class="logdata" v-bind:id="logd.stamp" style="display: contents;">
 					<span class="when" style="display: inline-block; max-width: max-content">{{String(l.Time).split(".")[0].split(" ")[1] }}</span>
 					<span class="who" style="display: inline-block; max-width: max-content">&lt; {{ l.Nick}} &gt;</span>
 					<span class="what">{{ l.Said }}</span>
