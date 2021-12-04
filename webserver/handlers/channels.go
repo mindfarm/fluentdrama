@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -117,17 +118,20 @@ func (hd *handlerData) Logs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appLoc, err := os.Executable()
+	app, err := os.Executable()
+	if err != nil {
+		log.Printf("ERROR getting the executable path %v", err)
+	}
+	appPath, err := filepath.Abs(filepath.Dir(app))
 	if err != nil {
 		log.Printf("ERROR getting the executable path %v", err)
 	}
 	if strings.HasSuffix(r.URL.Path, ".js") {
 		w.Header().Set("Content-Type", "text/javascript")
-		http.ServeFile(w, r, appLoc+"/assets"+r.URL.Path)
+		http.ServeFile(w, r, appPath+"/assets/"+r.URL.Path)
 	} else {
 		w.Header().Set("Content-Type", "text/html")
-		// index.html
-		http.ServeFile(w, r, appLoc+"/assets/index.html")
+		http.ServeFile(w, r, appPath+"/assets/index.html")
 	}
 	// if we get here the path hasn't been handled by previous code
 	// _, err := w.Write([]byte(index))
