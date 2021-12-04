@@ -6,13 +6,13 @@
 		<script src="vue.js"></script>
 	</head>
 	<body>
-		<div id="banner" style="border: thin solid red">
-		All data published in accordance with Article 9, Paragraph 2, point (e)
+		<div id="banner" style="padding:1em">
+			<b>All data published in accordance with Article 9, Paragraph 2, point (e)
 		of the GDPR. For further information please read 
-		<a href="https://gdpr-info.eu/art-9-gdpr/">Article 9</a>.
+		<a href="https://gdpr-info.eu/art-9-gdpr/">Article 9</a>.</b>
 		</div>
-		<div id="channels" style="float:left; border: thin solid
-			blue; max-width: max-content">
+		<div id="channels" style="float:left; max-width: max-content;
+			max-height: 15em; overflow-y:scroll">
 			<div  v-for="chans in channelList" style="text-align: center">
 				Channels
 				<ul style="list-style: none; text-align: left">
@@ -22,7 +22,8 @@
 			</div>
 		</div>
 		<div id="logs" style="max-height:50em; overflow-y: scroll;
-			overflow-wrap: break-word">
+			overflow-wrap: break-word; background-color: #dee0e7;
+			padding:1em">
 			<div v-for="logd in logList">
 			<div v-for="l in logd" :key="l.Time">
 				<div class="logdata" v-bind:id="logd.stamp" style="display: contents;">
