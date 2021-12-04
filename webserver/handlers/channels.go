@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -55,20 +57,18 @@ func (hd *handlerData) GetChannels(w http.ResponseWriter, r *http.Request) {
 const maxQueryLength = 256
 
 // Root route handler - default routes
-func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
+func (hd *handlerData) Logs(w http.ResponseWriter, r *http.Request) {
 	path := []rune(r.URL.Path)
-	log.Printf("PROCESSING PATH %s", r.URL.Path)
 	if len(path) > maxQueryLength {
 		return
 	}
 
 	// Is this a channel request
 	if len(path) > 1 && (path[0] == '#' || (path[0] == '/' && path[1] == '#')) {
-		log.Printf("Channel request")
 		// split on '/'
 		chunks := []string{}
 		holder := []rune{}
-		for i := 1; i < len(path); i++ {
+		for i := 0; i < len(path); i++ {
 			if path[i] == '/' {
 				chunks = append(chunks, string(holder))
 				holder = []rune{}
@@ -97,7 +97,6 @@ func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 		if len(chunks) > 2 {
 			nick = chunks[2]
 		}
-		log.Printf("Fetching logs for channel %s", channel)
 		logs, err := hd.ds.GetChannelLogs(context.Background(), channel, nick, date)
 		if err != nil {
 			log.Printf("ERROR getting channel logs: %v", err)
@@ -116,17 +115,23 @@ func (hd *handlerData) Root(w http.ResponseWriter, r *http.Request) {
 			log.Printf("ERROR writing logs in GetChannelLogs handler %v", err)
 			return
 		}
-
+		return
 	}
 
+	app, err := os.Executable()
+	if err != nil {
+		log.Printf("ERROR getting the executable path %v", err)
+	}
+	appPath, err := filepath.Abs(filepath.Dir(app))
+	if err != nil {
+		log.Printf("ERROR getting the executable path %v", err)
+	}
 	if strings.HasSuffix(r.URL.Path, ".js") {
-		log.Printf("SERVING %s", r.URL.Path)
 		w.Header().Set("Content-Type", "text/javascript")
-		http.ServeFile(w, r, "/var/www/irclogserver/assets"+r.URL.Path)
+		http.ServeFile(w, r, appPath+"/assets/"+r.URL.Path)
 	} else {
-		log.Print("SERVING INDEX")
 		w.Header().Set("Content-Type", "text/html")
-		http.ServeFile(w, r, "/var/www/irclogserver/assets")
+		http.ServeFile(w, r, appPath+"/assets/index.html")
 	}
 	// if we get here the path hasn't been handled by previous code
 	// _, err := w.Write([]byte(index))

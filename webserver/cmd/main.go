@@ -44,7 +44,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	c := handlers.NewHandlerData(ds)
-	mux.Handle("/logs/", AllowCors(http.HandlerFunc(c.Root)))
+	mux.Handle("/logs/", http.StripPrefix("/logs/", AllowCors(http.HandlerFunc(c.Logs))))
 	mux.Handle("/channels", AllowCors(http.HandlerFunc(c.GetChannels)))
 
 	// listen on all localhost
