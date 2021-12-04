@@ -34,7 +34,7 @@ func NewPGCustomerRepo(connString string) (*PGCustomerRepo, error) {
 
 // GetChannels -
 func (p *PGCustomerRepo) GetChannels(ctx context.Context) ([]string, error) {
-	rows, err := p.DbHandler.Query(`SELECT name from channels`)
+	rows, err := p.DbHandler.Query(`SELECT name FROM channels ORDER BY name ASC`)
 	if err != nil {
 		return nil, fmt.Errorf(`unable to fetch channels with error %w`, err)
 	}
