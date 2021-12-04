@@ -12,16 +12,15 @@
 		<a href="https://gdpr-info.eu/art-9-gdpr/">Article 9</a>.
 		</div>
 		<div id="channels" style="width: 10em; border: thin solid red">
-			<ul style="list-style: none;">
-				<channel-name
-					v-for="name in channelList"
-					v-bind:channel="name"
-				></channel-name>
-			</ul>
+			<div  v-for="chans in channelList">
+				<ul style="list-style: none;">
+					<li v-for="chan in chans" v-on:click="gLogs(chan)">{{ chan }}</li>
+				</ul>
+			</div>
 		</div>
 		<div id="logs">
 			<div v-for="logd in logList">
-			<div v-for="l in logd" :key="l.stamp">
+			<div v-for="l in logd" :key="l.Time">
 				<div class="logdata" v-bind:id="logd.stamp" style="display: contents">
 					<span class="when" style="display: inline-block; max-width: max-content">{{String(l.Time).split(".")[0].split(" ")[1] }}</span>
 					<span class="who" style="display: inline-block; max-width: max-content">&lt; {{ l.Nick}} &gt;</span>
@@ -31,18 +30,22 @@
 			</div>
 		</div>
 		<script type="text/javascript">
-			Vue.component('channel-name', {
-				props: ['channel'],
-				template: '<li><a v-bind:href="`/` + channel.name ">{{ channel.name }}</a></li>'
-			})
-			var channels = new Vue({
+			var vue = new Vue({
 				el: '#channels',
-				data: {
-					channelList: [
-						{ name: '#go-nuts' },
-						{ name: '#libera' },
-						{ name: '##rust' }
-					]
+				data () {
+					return {
+						channelList: []
+					}
+				},
+				methods: {
+					gLogs(channelName){
+						logs.getLogs(channelName)
+					}
+				},
+				mounted() {
+					fetch('/channels')
+						.then(response => response.json())
+						.then(data => (this.channelList = data));
 				}
 			})
 			var logs = new Vue ({
@@ -52,10 +55,16 @@
 						logList: []
 					}
 				},
-				mounted() {
-					fetch('http://mindfarm.nz/%23go-nuts/')
+				methods: {
+					getLogs(channelName) {
+					cName = encodeURIComponent(channelName)
+					fetch('/logs/'+cName+'/')
 						.then(response => response.json())
 						.then(data => (this.logList = data));
+					}
+				},
+				mounted: function() {
+					this.getLogs('#go-nuts')
 				}
 			})
 		</script>
